@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>학교 스마트 알리미 - JSON 연동형</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* 기존 디자인 스타일 유지 (생략 가능하지만 코드 완결성을 위해 포함) */
+        :root { --primary-color: #1e3a8a; --secondary-color: #3b82f6; --bg-color: #f8fafc; }
+        body { font-family: sans-serif; background-color: var(--bg-color); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        #chat-container { width: 400px; height: 600px; background: white; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; }
+        .chat-header { background: var(--primary-color); color: white; padding: 20px; font-weight: bold; display: flex; align-items: center; gap: 10px; }
+        #chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .message { max-width: 80%; padding: 10px; border-radius: 10px; font-size: 14px; }
+        .bot { background: #eee; align-self: flex-start; }
+        .user { background: var(--secondary-color); color: white; align-self: flex-end; }
+        .chat-input-area { padding: 15px; border-top: 1px solid #ddd; display: flex; gap: 5px; }
+        input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        button { background: var(--primary-color); color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div id="chat-container">
+    <div class="chat-header"><i data-lucide="bot"></i> 스마트 알리미</div>
+    <div id="chat-messages">
+        <div class="message bot">데이터를 불러오는 중입니다...</div>
+    </div>
+    <div class="chat-input-area">
+        <input type="text" id="user-input" placeholder="질문을 입력하세요...">
+        <button onclick="sendMessage()">전송</button>
+    </div>
+</div>
+
+<script>
+    lucide.createIcons();
+    let knowledgeBase = {};
+
+    // [핵심] 서버에 있는 JSON 파일을 읽어오는 함수
+    async function loadData() {
+        try {
+            // 동일 경로에 있는 knowledgeBase.json 파일을 호출
+            const response = await fetch('knowledgeBase.json');
+            if (!response.ok) throw new Error('파일을 찾을 수 없습니다.');
+            
+            knowledgeBase = await response.json();
+            
+            const msgBox = document.getElementById('chat-messages');
+            msgBox.innerHTML = '<div class="message bot">연결 성공! 무엇이든 물어보세요.</div>';
+        } catch (error) {
+            console.error('데이터 로드 실패:', error);
+            document.getElementById('chat-messages').innerHTML = 
+                '<div class="message bot">데이터를 불러오지 못했습니다. 서버 설정을 확인해주세요.</div>';
+        }
+    }
+
+    function sendMessage() {
+        const input = document.getElementById('user-input');
+        const text = input.value.trim();
+        if (!text) return;
+
+        addMessage(text, 'user');
+        input.value = '';
+
+        setTimeout(() => {
+            let answer = "죄송합니다. 해당 정보는 아직 등록되지 않았습니다.";
+            for (let key in knowledgeBase) {
+                if (text.includes(key)) {
+                    answer = knowledgeBase[key];
+                    break;
+                }
+            }
+            addMessage(answer, 'bot');
+        }, 500);
+    }
+
+    function addMessage(text, sender) {
+        const chatMessages = document.getElementById('chat-messages');
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${sender}`;
+        msgDiv.innerText = text;
+        chatMessages.appendChild(msgDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // 페이지 시작 시 데이터 로드
+    loadData();
+</script>
+</body>
+</html>
