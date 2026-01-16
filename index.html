@@ -2,76 +2,144 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>학교 스마트 알리미 - JSON 연동형</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학교 스마트 알리미 - 팝업형</title>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        /* 기존 디자인 스타일 유지 (생략 가능하지만 코드 완결성을 위해 포함) */
         :root { --primary-color: #1e3a8a; --secondary-color: #3b82f6; --bg-color: #f8fafc; }
-        body { font-family: sans-serif; background-color: var(--bg-color); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        #chat-container { width: 400px; height: 600px; background: white; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; }
-        .chat-header { background: var(--primary-color); color: white; padding: 20px; font-weight: bold; display: flex; align-items: center; gap: 10px; }
-        #chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-        .message { max-width: 80%; padding: 10px; border-radius: 10px; font-size: 14px; }
-        .bot { background: #eee; align-self: flex-start; }
-        .user { background: var(--secondary-color); color: white; align-self: flex-end; }
-        .chat-input-area { padding: 15px; border-top: 1px solid #ddd; display: flex; gap: 5px; }
-        input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
-        button { background: var(--primary-color); color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; }
+        body { font-family: 'Pretendard', sans-serif; margin: 0; background: #e2e8f0; }
+
+        /* 1. 플로팅 버튼 (챗봇 열기 버튼) */
+        #chat-launcher {
+            position: fixed; bottom: 30px; right: 30px;
+            width: 60px; height: 60px;
+            background: var(--primary-color);
+            color: white; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease; z-index: 1000;
+        }
+        #chat-launcher:hover { transform: scale(1.1); }
+
+        /* 2. 챗봇 팝업창 (기본 숨김) */
+        #chat-container {
+            position: fixed; bottom: 100px; right: 30px;
+            width: 380px; height: 550px;
+            background: white; border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            display: none; flex-direction: column; overflow: hidden;
+            z-index: 1000; animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        .chat-header { background: var(--primary-color); color: white; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; font-weight: bold; }
+        #chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+        
+        .message { max-width: 85%; padding: 10px 14px; border-radius: 15px; font-size: 14px; line-height: 1.5; }
+        .bot { background: #f1f5f9; align-self: flex-start; border-top-left-radius: 2px; }
+        .user { background: var(--secondary-color); color: white; align-self: flex-end; border-top-right-radius: 2px; }
+
+        .quick-menu { display: flex; gap: 8px; padding: 0 20px 15px; overflow-x: auto; scrollbar-width: none; }
+        .quick-btn { background: white; border: 1px solid var(--primary-color); color: var(--primary-color); padding: 5px 12px; border-radius: 20px; font-size: 11px; white-space: nowrap; cursor: pointer; }
+        
+        .chat-input-area { padding: 15px; border-top: 1px solid #e2e8f0; display: flex; gap: 8px; }
+        input { flex: 1; border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 8px; outline: none; font-size: 14px; }
+        .send-btn { background: var(--primary-color); color: white; border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+
+        /* 모바일 대응 */
+        @media (max-width: 480px) {
+            #chat-container { width: calc(100% - 40px); right: 20px; bottom: 90px; height: 70vh; }
+        }
     </style>
 </head>
 <body>
 
+<div style="padding: 50px;">
+    <h1>우리 학교 홈페이지</h1>
+    <p>우측 하단의 파란색 버튼을 눌러 챗봇을 실행해보세요.</p>
+</div>
+
+<div id="chat-launcher" onclick="toggleChat()">
+    <i data-lucide="message-circle" id="launcher-icon"></i>
+</div>
+
 <div id="chat-container">
-    <div class="chat-header"><i data-lucide="bot"></i> 스마트 알리미</div>
-    <div id="chat-messages">
-        <div class="message bot">데이터를 불러오는 중입니다...</div>
+    <div class="chat-header">
+        <span><i data-lucide="bot" style="vertical-align: middle; margin-right: 5px;"></i> 스마트 알리미</span>
+        <i data-lucide="x" onclick="toggleChat()" style="cursor: pointer;"></i>
     </div>
+    
+    <div id="chat-messages">
+        <div class="message bot">데이터를 불러오는 중...</div>
+    </div>
+    
+    <div class="quick-menu" id="quick-menu"></div>
+    
     <div class="chat-input-area">
-        <input type="text" id="user-input" placeholder="질문을 입력하세요...">
-        <button onclick="sendMessage()">전송</button>
+        <input type="text" id="user-input" placeholder="질문을 입력하세요..." onkeypress="if(event.keyCode==13) sendMessage()">
+        <button class="send-btn" onclick="sendMessage()"><i data-lucide="send" size="18"></i></button>
     </div>
 </div>
 
 <script>
     lucide.createIcons();
     let knowledgeBase = {};
+    let isChatOpen = false;
 
-    // [핵심] 서버에 있는 JSON 파일을 읽어오는 함수
+    // 1. 팝업 토글 함수
+    function toggleChat() {
+        const container = document.getElementById('chat-container');
+        const icon = document.getElementById('launcher-icon');
+        isChatOpen = !isChatOpen;
+        
+        if (isChatOpen) {
+            container.style.display = 'flex';
+            icon.setAttribute('data-lucide', 'x');
+        } else {
+            container.style.display = 'none';
+            icon.setAttribute('data-lucide', 'message-circle');
+        }
+        lucide.createIcons();
+    }
+
+    // 2. 데이터 불러오기
     async function loadData() {
         try {
-            // 동일 경로에 있는 knowledgeBase.json 파일을 호출
             const response = await fetch('knowledgeBase.json');
-            if (!response.ok) throw new Error('파일을 찾을 수 없습니다.');
-            
             knowledgeBase = await response.json();
-            
-            const msgBox = document.getElementById('chat-messages');
-            msgBox.innerHTML = '<div class="message bot">연결 성공! 무엇이든 물어보세요.</div>';
-        } catch (error) {
-            console.error('데이터 로드 실패:', error);
-            document.getElementById('chat-messages').innerHTML = 
-                '<div class="message bot">데이터를 불러오지 못했습니다. 서버 설정을 확인해주세요.</div>';
+            document.getElementById('chat-messages').innerHTML = '<div class="message bot">안녕하세요! 무엇을 도와드릴까요?</div>';
+            renderQuickMenu();
+        } catch (e) {
+            document.getElementById('chat-messages').innerHTML = '<div class="message bot">데이터 연결에 실패했습니다.</div>';
         }
+    }
+
+    function renderQuickMenu() {
+        const menu = document.getElementById('quick-menu');
+        menu.innerHTML = '';
+        Object.keys(knowledgeBase).forEach(key => {
+            const btn = document.createElement('button');
+            btn.className = 'quick-btn';
+            btn.innerText = `# ${key}`;
+            btn.onclick = () => ask(key);
+            menu.appendChild(btn);
+        });
     }
 
     function sendMessage() {
         const input = document.getElementById('user-input');
-        const text = input.value.trim();
-        if (!text) return;
+        if (input.value.trim()) { ask(input.value.trim()); input.value = ''; }
+    }
 
-        addMessage(text, 'user');
-        input.value = '';
-
+    function ask(question) {
+        addMessage(question, 'user');
         setTimeout(() => {
-            let answer = "죄송합니다. 해당 정보는 아직 등록되지 않았습니다.";
-            for (let key in knowledgeBase) {
-                if (text.includes(key)) {
-                    answer = knowledgeBase[key];
-                    break;
-                }
-            }
+            let answer = "해당 정보는 아직 등록되지 않았습니다.";
+            for (let key in knowledgeBase) { if (question.includes(key)) { answer = knowledgeBase[key]; break; } }
             addMessage(answer, 'bot');
-        }, 500);
+        }, 400);
     }
 
     function addMessage(text, sender) {
@@ -83,7 +151,6 @@
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
-    // 페이지 시작 시 데이터 로드
     loadData();
 </script>
 </body>
