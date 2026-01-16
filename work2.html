@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학교 조종례 통합 관리 시스템</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
+        body { font-family: 'Pretendard', sans-serif; background-color: #f3f4f6; color: #1f2937; }
+        .grade-all { background-color: #fee2e2; color: #991b1b; border-left: 4px solid #ef4444; }
+        .grade-1 { background-color: #dcfce7; color: #166534; border-left: 4px solid #22c55e; } 
+        .grade-2 { background-color: #e0e7ff; color: #3730a3; border-left: 4px solid #6366f1; } 
+        .grade-3 { background-color: #fef3c7; color: #92400e; border-left: 4px solid #f59e0b; } 
+        .calendar-day { min-height: 140px; transition: 0.2s; border: 0.5px solid #e5e7eb; background: white; }
+        .calendar-day:hover { background-color: #f9fafb; z-index: 10; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        .event-item { font-size: 0.75rem; padding: 4px 8px; margin-top: 4px; border-radius: 4px; font-weight: 600; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    </style>
+</head>
+<body class="p-4">
+
+    <div id="loadingOverlay" class="fixed inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center z-[100]">
+        <div class="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-2"></div>
+        <p class="text-sm font-bold text-gray-600">데이터 연결 중...</p>
+    </div>
+
+    <div class="max-w-6xl mx-auto">
+        <header class="flex flex-col md:flex-row items-center justify-between mb-6 bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+            <div>
+                <h1 class="text-2xl font-black text-gray-900 tracking-tight">🏫 조종례 알리미</h1>
+                <p class="text-blue-600 font-medium text-sm">제공해주신 최신 URL로 연동되었습니다.</p>
+            </div>
+            <div class="flex gap-2 mt-4 md:mt-0">
+                <button onclick="fetchData()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-5 rounded-xl transition">🔄 새로고침</button>
+                <button onclick="checkAdminAccess('add')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition shadow-lg">+ 일정 등록</button>
+            </div>
+        </header>
+
+        <div class="flex flex-wrap gap-2 mb-6" id="filterBar">
+            <button onclick="filterGrade('all')" class="px-5 py-2 rounded-full font-bold transition bg-gray-800 text-white" data-g="all">전체보기</button>
+            <button onclick="filterGrade('1')" class="px-5 py-2 rounded-full font-bold transition bg-white text-gray-600 border" data-g="1">1학년</button>
+            <button onclick="filterGrade('2')" class="px-5 py-2 rounded-full font-bold transition bg-white text-gray-600 border" data-g="2">2학년</button>
+            <button onclick="filterGrade('3')" class="px-5 py-2 rounded-full font-bold transition bg-white text-gray-600 border" data-g="3">3학년</button>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-200">
+            <div class="flex items-center justify-between p-4 border-b">
+                <h2 id="monthTitle" class="text-xl font-bold text-gray-800"></h2>
+                <div class="flex bg-gray-100 p-1 rounded-lg">
+                    <button onclick="changeMonth(-1)" class="p-2 hover:bg-white rounded-md transition">◀</button>
+                    <button onclick="changeMonth(1)" class="p-2 hover:bg-white rounded-md transition">▶</button>
+                </div>
+            </div>
+            <div class="grid grid-cols-7 text-center font-bold text-xs text-gray-400 py-3 bg-gray-50 border-b">
+                <div>SUN</div><div>MON</div><div>TUE</div><div>WED</div><div>THU</div><div>FRI</div><div>SAT</div>
+            </div>
+            <div id="calendarGrid" class="grid grid-cols-7"></div>
+        </div>
+    </div>
+
+    <div id="addModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[110]">
+        <div class="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl">
+            <h3 id="modalTitle" class="text-2xl font-bold mb-6">📝 일정 관리</h3>
+            <input type="hidden" id="editId">
+            <div class="space-y-4">
+                <select id="inGrade" class="w-full p-3 bg-gray-50 border rounded-xl outline-none"><option value="all">전체 공통</option><option value="1">1학년</option><option value="2">2학년</option><option value="3">3학년</option></select>
+                <input type="date" id="inDate" class="w-full p-3 bg-gray-50 border rounded-xl outline-none">
+                <input type="text" id="inTitle" placeholder="일정 제목" class="w-full p-3 bg-gray-50 border rounded-xl outline-none">
+                <textarea id="inDesc" placeholder="안내 내용" rows="3" class="w-full p-3 bg-gray-50 border rounded-xl outline-none"></textarea>
+            </div>
+            <div class="flex gap-3 mt-8">
+                <button onclick="closeModal('addModal')" class="flex-1 py-3 text-gray-500 font-bold hover:bg-gray-100 rounded-xl">취소</button>
+                <button id="saveBtn" onclick="saveEvent()" class="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl shadow-md">저장하기</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="viewModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[110]">
+        <div class="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl">
+            <div id="viewHeader" class="text-xs font-bold uppercase tracking-widest mb-2 px-2 py-1 inline-block rounded-md"></div>
+            <h3 id="viewTitle" class="text-2xl font-bold mb-4"></h3>
+            <div class="bg-gray-50 p-5 rounded-2xl mb-6 min-h-[120px] whitespace-pre-wrap text-gray-700" id="viewDesc"></div>
+            <div class="flex gap-2">
+                <button onclick="checkAdminAccess('edit')" class="bg-amber-50 text-amber-600 font-bold px-4 py-3 rounded-xl hover:bg-amber-100 transition">수정</button>
+                <button onclick="checkAdminAccess('delete')" class="bg-red-50 text-red-600 font-bold px-4 py-3 rounded-xl hover:bg-red-100 transition">삭제</button>
+                <button onclick="closeModal('viewModal')" class="flex-1 py-3 bg-gray-800 text-white font-bold rounded-xl hover:bg-gray-900 transition">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 새로 주신 URL 반영 완료
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzcbbLdinP0cbp6mlghnVzztKUQqvBeN1qLyUUX_9xP-slnLG_bIn7TdZ6_oYjifMtdHw/exec";
+        const ADMIN_PASSWORD = "1234"; // 관리자 비밀번호
+        
+        let date = new Date();
+        let currentGradeFilter = 'all';
+        let events = [];
+        let selectedEvent = null;
+
+        async function fetchData() {
+            showLoading(true);
+            try {
+                const res = await fetch(SCRIPT_URL);
+                const data = await res.json();
+                events = data;
+                render();
+            } catch (e) { 
+                console.error(e);
+                alert('데이터 로딩에 실패했습니다. 배포 설정을 확인해 주세요.'); 
+            } finally { showLoading(false); }
+        }
+
+        function render() {
+            const grid = document.getElementById('calendarGrid');
+            const title = document.getElementById('monthTitle');
+            grid.innerHTML = '';
+            const year = date.getFullYear(); const month = date.getMonth();
+            title.innerText = `${year}년 ${month + 1}월`;
+            const firstDay = new Date(year, month, 1).getDay();
+            const lastDate = new Date(year, month + 1, 0).getDate();
+
+            for(let i=0; i<firstDay; i++) grid.innerHTML += `<div class="calendar-day bg-gray-50/50"></div>`;
+            for(let d=1; d<=lastDate; d++) {
+                const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const dayEvents = events.filter(e => {
+                    const eDate = new Date(e.date).toISOString().split('T')[0];
+                    return eDate === dateStr && (currentGradeFilter === 'all' || e.grade.toString() === currentGradeFilter || e.grade === 'all');
+                });
+                grid.innerHTML += `
+                    <div class="calendar-day p-2">
+                        <div class="text-xs font-bold ${new Date(dateStr).getDay() === 0 ? 'text-red-500' : 'text-gray-400'}">${d}</div>
+                        <div class="mt-1 space-y-1">
+                            ${dayEvents.map(e => `<div class="event-item grade-${e.grade}" onclick='viewDetail(${JSON.stringify(e).replace(/'/g, "&apos;")})'>${e.title}</div>`).join('')}
+                        </div>
+                    </div>`;
+            }
+        }
+
+        function checkAdminAccess(mode) {
+            const pw = prompt("관리자 비밀번호를 입력하세요.");
+            if (pw !== ADMIN_PASSWORD) return pw !== null && alert("비밀번호가 틀렸습니다.");
+            if (mode === 'add') {
+                document.getElementById('modalTitle').innerText = "📝 일정 등록";
+                document.getElementById('editId').value = "";
+                document.getElementById('inTitle').value = "";
+                document.getElementById('inDesc').value = "";
+                openModal('addModal');
+            } else if (mode === 'edit') {
+                document.getElementById('modalTitle').innerText = "✏️ 일정 수정";
+                document.getElementById('editId').value = selectedEvent.id;
+                document.getElementById('inGrade').value = selectedEvent.grade;
+                document.getElementById('inDate').value = new Date(selectedEvent.date).toISOString().split('T')[0];
+                document.getElementById('inTitle').value = selectedEvent.title;
+                document.getElementById('inDesc').value = selectedEvent.desc;
+                closeModal('viewModal');
+                openModal('addModal');
+            } else if (mode === 'delete') {
+                if(confirm("이 일정을 삭제하시겠습니까?")) deleteEvent();
+            }
+        }
+
+        async function saveEvent() {
+            const btn = document.getElementById('saveBtn');
+            const editId = document.getElementById('editId').value;
+            const data = {
+                id: editId || Date.now(),
+                grade: document.getElementById('inGrade').value,
+                date: document.getElementById('inDate').value,
+                title: document.getElementById('inTitle').value,
+                desc: document.getElementById('inDesc').value,
+                action: editId ? 'edit' : 'add'
+            };
+            if(!data.date || !data.title) return alert('필수 항목을 입력해주세요.');
+            btn.disabled = true; btn.innerText = "처리 중...";
+            try {
+                await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(data) });
+                alert('요청이 완료되었습니다. 반영까지 잠시만 기다려주세요.');
+                closeModal('addModal');
+                setTimeout(fetchData, 1500);
+            } catch (e) { alert('오류가 발생했습니다.'); }
+            finally { btn.disabled = false; btn.innerText = "저장하기"; }
+        }
+
+        async function deleteEvent() {
+            showLoading(true);
+            try {
+                await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ id: selectedEvent.id, action: 'delete' }) });
+                alert('삭제되었습니다.');
+                closeModal('viewModal');
+                setTimeout(fetchData, 1500);
+            } catch (e) { alert('삭제 실패'); }
+        }
+
+        function viewDetail(e) {
+            selectedEvent = e;
+            const h = document.getElementById('viewHeader');
+            h.innerText = e.grade === 'all' ? '전체 공통' : `${e.grade}학년 공지`;
+            h.className = `text-xs font-bold px-2 py-1 inline-block rounded-md mb-2 grade-${e.grade}`;
+            document.getElementById('viewTitle').innerText = e.title;
+            document.getElementById('viewDesc').innerText = e.desc || '내용 없음';
+            openModal('viewModal');
+        }
+
+        function filterGrade(g) { 
+            currentGradeFilter = g; 
+            document.querySelectorAll('#filterBar button').forEach(btn => btn.className = btn.dataset.g === g ? "px-5 py-2 rounded-full font-bold transition bg-gray-800 text-white shadow-md" : "px-5 py-2 rounded-full font-bold transition bg-white text-gray-600 border"); 
+            render(); 
+        }
+        function changeMonth(v) { date.setMonth(date.getMonth() + v); render(); }
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+        function showLoading(v) { document.getElementById('loadingOverlay').classList.toggle('hidden', !v); }
+        window.onload = fetchData;
+    </script>
+</body>
+</html>
